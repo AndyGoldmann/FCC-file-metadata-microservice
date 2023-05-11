@@ -4,8 +4,15 @@ const cors = require('cors')
 const bodyParser = require('body-parser')
 const User = require('./models/User')
 const Exercise = require('./models/Exercise')
+const https = require('https');
+const fs = require('fs');
 require('./mongoose') // activate and connect DB, at Mongo Atlas or whatever
 require('dotenv').config()
+
+const options = {
+  key: fs.readFileSync(path.join(__dirname, 'cert', 'key.pem')),
+  cert: fs.readFileSync(path.join(__dirname, 'cert', 'cert.pem'))
+} 
 
 // middlewares and more 
 app.use(cors())
@@ -118,6 +125,9 @@ app.get('/api/users/:_id/logs', (req, res) => {
     });
 });
 
+https.createServer(options, app).listen(process.env.PORT || 3100, console.log('--Server running somewhere-- 👍👍'))
+/*
 const listener = app.listen(process.env.PORT || 3100, () => {
   console.log('Your app is listening on port ' + listener.address().port)
 })
+*/
