@@ -5,6 +5,7 @@ const bodyParser = require('body-parser')
 const User = require('./models/User')
 const Exercise = require('./models/Exercise')
 const https = require('https');
+const path = require('path')
 const fs = require('fs');
 require('./mongoose') // activate and connect DB, at Mongo Atlas or whatever
 require('dotenv').config()
@@ -93,35 +94,64 @@ app.post('/api/users/:_id/exercises', (req, res) => {
 });
 
 app.get('/api/users/:_id/logs', (req, res) => {
-  async function obtainUsersLog (userID, reqFrom, reqTo, reqLimit) {
-    const from = reqFrom;
-    const to = reqTo;    
-    const limit = reqLimit;
+  async function obtainUsersLog (userID) {
     const user = await User.findById(userID, '_id username count log')
-      .populate({ path: 'log', select: 'description date duration', limit: limit });
-      
+      .populate({ path: 'log', select: 'description date duration' });
+    
     return user;
   }
-
+  
   const userID = req.params._id;
   const { from, to, limit } = req.query;
-  obtainUsersLog(userID, from, to, limit)
-    .then(userAndLogs => {
-      if (from && to){
-        const unixFrom = new Date(from).getTime()
-        const unixTo = new Date(to).getTime()
-        const requiredLog = [];
-        for (let i=1; i > user.log.length; i++){
-          const logDate = user.log[i-1];
-          const date = new Date(logDate).getTime()
-          if ((date >= unixFrom) && (date <= unixTo)) {
-            requiredLog.push(date)
+  obtainUsersLog(userID)
+  .then(user => {
+    const reqFrom = new Date(from).getTime() || null;
+    const reqTo = new Date(to).getTime() || null;    
+    const reqLimit = Number(limit) || 0;
+    console.log(req.query)
+
+    if (from && to) {
+        let logRequired = user.log.reduce((newArry, currentLog) => {
+          const logDate = new Date(currentLog.date).getTime()
+          if (logDate >= reqFrom && logDate <= reqTo) {
+            const logFixed = { // for a strange reason, log._id appears in resulted array
+              description: currentLog.description,
+              date: new Date(currentLog.date).toDateString(),
+              duration: currentLog.duration
+            }
+            newArry.push(logFixed); 
           }
-        }
+          return newArry;
+        }, []);
+
+        if (reqLimit) logRequired = logRequired.slice(0, reqLimit);
+
+        const jsonUser = {
+          _id: user._id,
+          username: user.username,
+          count: user.count,
+          log: logRequired
+        };
+  
+        return res.json(jsonUser);
       }
 
-      console.log(req.query)
-      res.json(userAndLogs);
+    if (reqLimit) { 
+      let logRequired = user.log.slice(0, reqLimit)
+      logRequired = logRequired.map(currentLog => {
+        currentLog.date = new Date(currentLog.date).toDateString()
+      })
+      const jsonUser = {
+        _id: user._id,
+        username: user.username,
+        count: user.count,
+        log: logRequired
+      };
+
+      return res.json(jsonUser)
+    }
+
+      res.json(user);
     });
 });
 
